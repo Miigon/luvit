@@ -658,6 +658,32 @@ function fs.ReadStream:_read(n)
     end
   end
 
+  fs.read(self.fd, to_read, self.offset, function(err, bytes)
+    if err then return self:destroy(err) end
+    if #bytes > 0 then
+      self.bytesRead = self.bytesRead + #bytes
+      if self.offset then
+        self.offset = self.offset + #bytes
+      end
+      self:push(bytes)
+    else
+      self:push()
+    end
+  end)
+end
+function fs.ReadStream:_readSync(n)
+  if not self.fd then
+    return self:once('open', bind(self._read, self, n))
+  end
+
+  local to_read = self.chunkSize or n
+  if self.length then
+    -- indicating length was set in option; need to check boundary
+    if to_read + self.bytesRead > self.length then
+      to_read = self.length - self.bytesRead
+    end
+  end
+
   local bytes,err = fs.readSync(self.fd, to_read, self.offset)
   if err then return self:destroy(err) end
   if #bytes > 0 then
